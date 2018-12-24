@@ -59,28 +59,41 @@ int Daum::stop() {
 }
 
 bool Daum::discover(QString dev) {
+	qDebug() << "discover - device: " << dev;
+
     if (!openPort(dev)) {
+		qWarning() << "discover - cannot open device "<< dev; 
         return false;
     }
 
     QSerialPort &s(*serial_dev_);
     QByteArray data;
-    data.append(0x11);
+    data.append((char)0x11);  // Send Get Address
+	data.append((char)0x00);  // af: Dummy, will be ignored by device  
 
     s.write(data);
     if (!s.waitForBytesWritten(1000)) {
+		qWarning() << "discover - timeout send";
+		closePort();
         return false;
     }
     if (!s.waitForReadyRead(1000)) {
+		qWarning() << "discover - timeout read"; 
+		closePort();
         return false;
     }
     data = s.read(2);
     if ((int)data[0] != 0x11) {
+		qWarning() << "discover - bad answer";
+		qDebug() << "Byte [0] = " << (int)data[0] << " decimal";		
+		qDebug() << "Byte [1] = " << (int)data[1] << " decimal";		
+		closePort();
         return false;
     }
     data = s.readAll();
     closePort();
 
+	qDebug() << "discover - ok ";
     return true;
 }
 
@@ -142,6 +155,8 @@ bool Daum::closePort() {
 
 void Daum::run() {
     //closePort();
+	qDebug() << "run ...";
+
     if (!openPort(serialDeviceName_)) {
         exit(-1);
     }
@@ -180,6 +195,7 @@ void Daum::run() {
 }
 
 void Daum::initializeConnection() {
+	qDebug() << "initializeConnection ...";
     char addr = (char)GetAddress();
     {
         QMutexLocker locker(&pvars);
@@ -200,18 +216,20 @@ void Daum::initializeConnection() {
 
     // check version info for know devices
     int dat = GetDeviceVersion();
+	qDebug() << "GetDeviceVersion() returned " << dat;
     switch (dat) {
-    case 0x10:
-    case 0x20:
-    case 0x30:
-    case 0x40:
-    case 0x50:
-    case 0x55:
-    case 0x60:
+    case 0x10:				// Cardio
+	case 0x1E:				// Update Cockpit Older Version to Vita de Luxe
+    case 0x20:				// Fitness
+    case 0x30:				// Vita de Luxe
+    case 0x40:				// 8008
+    case 0x50:				// 8080
+    case 0x55:				// ??
+    case 0x60:				// Therapy
         qDebug() << "Daum cockpit verison: " << dat;
         break;
     default:
-        qWarning() << "unable to identify daum cockpit version";
+        qWarning() << "unable to identify daum cockpit version" << dat;
         this->exit(-1);
         break;  // unreached
     }
@@ -285,7 +303,7 @@ void Daum::requestRealtimeData() {
         deviceSpeed_ = speed;
         deviceHeartRate_ = pulse;
     }
-
+	qDebug() << "pwr=" << (int)pwr;
     // write load to device
     bool p = isPaused();
     unsigned int load = kDefaultLoad;
@@ -295,6 +313,7 @@ void Daum::requestRealtimeData() {
         pwr = loadToWrite_;
     }
 
+	qDebug() << "load=" << (int)load << "pwr=" << (int)pwr;
     if (!p && (forceUpdate_ || load != pwr)) {
         data.clear();
         data.append((char)0x51);

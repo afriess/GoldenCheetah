@@ -67,6 +67,21 @@ void DaumController::getRealtimeData(RealtimeData &rtData) {
     rtData.setHr(daumDevice_->getHeartRate());
     rtData.setCadence(daumDevice_->getCadence());
     rtData.setSpeed(daumDevice_->getSpeed());
+	
+	double v = rtData.getCadence()/60.0;
+	// using the algorithm from Steven Sansonetti of BT:
+	//  This is a 3rd order polynomial, where P = av3 + bv2 + cv + d
+	//  where:
+			double a =       2.90390167E-01; // ( 0.290390167)
+			double b =     - 4.61311774E-02; // ( -0.0461311774)
+			double c =       5.92125507E-01; // (0.592125507)
+			double d =       0.0;
+	double xx = (a*v*v*v + b*v*v +c*v + d);	
+    qDebug() << "xx load=" << (double)xx;
+	//rtData.setWatts;
+	
+	
+	
 }
 
 void DaumController::setLoad(double load) {

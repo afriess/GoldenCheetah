@@ -26,6 +26,8 @@
 
 DaumController::DaumController(TrainSidebar *parent,  DeviceConfiguration *dc) : RealtimeController(parent, dc) {
     daumDevice_ = new Daum(this, dc != 0 ? dc->portSpec : "", dc != 0 ? dc->deviceProfile : "");
+	// set default Mode
+	actMode = 1;
 }
 
 int DaumController::start() {
@@ -63,27 +65,54 @@ void DaumController::getRealtimeData(RealtimeData &rtData) {
         return;
     }
 
-    rtData.setWatts(daumDevice_->getPower());
+    qDebug() << "actMode =" <<(int)actMode;
+
+	// Calculation simplified from http://www.kreuzotter.de/deutsch/speed.htm
+	double V = daumDevice_->getSpeed() * 0.27778;
+	double slope = atan(rtData.getSlope()) * 0.01;
+	// Weight bike + person = 120.0 :-)
+	double wght = 120.0;
+	double Frg = 9.81 * (wght) * (0.0046  * cos(slope) + sin(slope)); 
+	double P = 1.025 * V * (0.3165 * (V * V) + Frg + V * 0.1);
+	if (P<=25) {
+		// Downhill is negative power, set to 25 to avoid problems
+		P = 25.0;
+	};	
+	
+	switch (actMode) {
+		case 2 : 
+			qDebug() << "P load=" << (double)P << "V corr in=" << (double)V << "Slope corr in=" << (double)slope;
+			// 
+			P = round(P / 5)  * 5; 
+	
+			daumDevice_->setLoad(P);
+			rtData.setWatts(P);
+			break;
+		default :
+			// Data is set by setload
+			rtData.setWatts(daumDevice_->getPower());
+			break;
+	}		
     rtData.setHr(daumDevice_->getHeartRate());
     rtData.setCadence(daumDevice_->getCadence());
     rtData.setSpeed(daumDevice_->getSpeed());
-	
-	double v = rtData.getCadence()/60.0;
-	// using the algorithm from Steven Sansonetti of BT:
-	//  This is a 3rd order polynomial, where P = av3 + bv2 + cv + d
-	//  where:
-			double a =       2.90390167E-01; // ( 0.290390167)
-			double b =     - 4.61311774E-02; // ( -0.0461311774)
-			double c =       5.92125507E-01; // (0.592125507)
-			double d =       0.0;
-	double xx = (a*v*v*v + b*v*v +c*v + d);	
-    qDebug() << "xx load=" << (double)xx;
-	//rtData.setWatts;
-	
-	
-	
 }
 
 void DaumController::setLoad(double load) {
-    daumDevice_->setLoad(load);
+	switch (actMode) {
+		case 2 : 
+		    // Not allowed, set by getrealtimedata
+			break;
+		default:
+			daumDevice_->setLoad(load);
+			break;
+	}
+}
+
+void DaumController::setMode(int mode)
+{
+	// mode 1 = ERG     (= Watt)
+	// mode 2 = SLOPE   (= slope %) 
+	qDebug() << "Set mode =" << (int)mode;
+	actMode = mode;
 }

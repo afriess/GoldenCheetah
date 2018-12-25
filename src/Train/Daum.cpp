@@ -311,6 +311,10 @@ void Daum::requestRealtimeData() {
         QMutexLocker locker(&pvars);
         load = load_;
         pwr = loadToWrite_;
+		if (pwr < 0) {
+			qDebug() << "pwr is negativ !!!! " << (int)pwr;
+			pwr = 0;
+		}	
     }
 
 	qDebug() << "load=" << (int)load << "pwr=" << (int)pwr;

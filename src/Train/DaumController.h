@@ -52,7 +52,9 @@ public:
     void getRealtimeData(RealtimeData &rtData);
 
     void setLoad(double);
-    void setMode(int) { return; }
+    void setMode(int);
+private:
+	int actMode;
 };
 
 #endif // _GC_DaumController_h

@@ -36,6 +36,7 @@
 #include "WithingsDownload.h"
 #include "CalendarDownload.h"
 #include "PMCData.h"
+#include "Banister.h"
 #include "ErgDB.h"
 #ifdef GC_HAVE_ICAL
 #include "ICalendar.h"
@@ -398,6 +399,7 @@ AthleteDirectoryStructure::AthleteDirectoryStructure(const QDir home){
     athlete_quarantine = "quarantine";
     athlete_planned = "planned";
     athlete_snippets = "snippets";
+    athlete_media = "media";
 
 }
 
@@ -425,6 +427,7 @@ AthleteDirectoryStructure::createAllSubdirs() {
     myhome.mkdir(athlete_quarantine);
     myhome.mkdir(athlete_planned);
     myhome.mkdir(athlete_snippets);
+    myhome.mkdir(athlete_media);
 
 }
 
@@ -445,7 +448,8 @@ AthleteDirectoryStructure::subDirsExist() {
             temp().exists() &&
             quarantine().exists()&&
             planned().exists() &&
-            snippets().exists()
+            snippets().exists() &&
+            media().exists()
             );
 }
 
@@ -517,6 +521,27 @@ Athlete::getHeight(RideFile *ride)
     if (!height) height = 1.7526f; // 5'9" is average male height
 
     return height;
+}
+
+// working with Banister data series
+Banister *
+Athlete::getBanisterFor(QString metricName, int t1 , int t2)
+{
+    Banister *returning = NULL;
+
+    // if we don't already have one, create it
+    returning = banisterData.value(metricName, NULL); // we do
+    if (!returning) {
+
+        // specification is blank and passes for all
+        returning = new Banister(context, metricName, t1, t2); // we don't seed t1/t2 yet. (maybe never will)
+
+        // add to our collection
+        banisterData.insert(metricName, returning);
+    }
+
+    return returning;
+
 }
 
 // working with PMC data series

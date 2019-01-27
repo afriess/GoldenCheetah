@@ -689,6 +689,62 @@ struct FitFileReaderState
         rideFile->setDeviceType(getManuProd(manu, prod));
     }
 
+
+    void decodePhysiologicalMetrics(const FitDefinition &def, int,
+                                    const std::vector<FitValue>& values) {
+        int i = 0;
+
+        foreach(const FitField &field, def.fields) {
+            fit_value_t value = values[i++].v;
+
+
+            if( value == NA_VALUE )
+                continue;
+
+            switch (field.num) {
+                case 7:   // METmax: 1 METmax = VO2max * 3.5, scale 65536
+                    rideFile->setTag("VO2max detected", QString::number(round(value / 65536.0 * 3.5 * 10.0) / 10.0));
+                    break;
+
+                case 4:   // Aerobic Training Effect, scale 10
+                    rideFile->setTag("Aerobic Training Effect", QString::number(value/10.0));
+                    break;
+
+                case 20:   // Anaerobic Training Effect, scale 10
+                    rideFile->setTag("Anaerobic Training Effect", QString::number(value/10.0));
+                    break;
+
+                case 9:   // Recovery Time, minutes
+                    rideFile->setTag("Recovery Time", QString::number(round(value/60.0)));
+                    break;
+
+                case 17:   // Performance Condition
+                    rideFile->setTag("Performance Condition", QString::number(value));
+                    break;
+
+                case 14:   // If watch detected Running Lactate Threshold Heart Rate, bpm
+                    if(rideFile->isRun() && value > 0){
+                        rideFile->setTag("LTHR detected", QString::number(value));
+                    }
+                    break;
+
+                case 15:   // If watch detected Running Lactate Threshold Speed, m/s
+                    if(rideFile->isRun() && value > 0){
+                        rideFile->setTag("LTS detected", QString::number(value/100.0));
+                    }
+                    break;
+
+
+                default: ; // do nothing
+            }
+
+
+            if (FIT_DEBUG && FIT_DEBUG_LEVEL>1) {
+                printf("decodePhysiologicalMetrics  field %d: %d bytes, num %d, type %d\n", i, field.size, field.num, field.type );
+            }
+        }
+    }
+
     void decodeSession(const FitDefinition &def, int,
                        const std::vector<FitValue>& values) {
         int i = 0;
@@ -1285,14 +1341,17 @@ struct FitFileReaderState
 
     void decodeLap(const FitDefinition &def, int time_offset,
                    const std::vector<FitValue>& values) {
-        time_t time = 0;
+        time_t iniTime;
         if (time_offset > 0)
-            time = last_time + time_offset;
+            iniTime = last_time + time_offset;
         else
-            time = last_time;
+            iniTime = last_time;
+
+        time_t time = 0;
         int i = 0;
         time_t this_start_time = 0;
         double total_distance = 0.0;
+        double total_elapsed_time = 0.0;
 
         QString lap_name;
 
@@ -1325,8 +1384,12 @@ struct FitFileReaderState
                 case 9:
                     total_distance = value.v / 100000.0;
                     break;
+                case 7:
+                    total_elapsed_time = value.v / 1000.0;
+                    break;
                 case 24:
                     //lap_trigger = value.v;
+
 
                 // other data (ignored at present):
                 case 254: // lap nbr
@@ -1334,7 +1397,7 @@ struct FitFileReaderState
                 case 4: // start_position_lon
                 case 5: // end_position_lat
                 case 6: // end_position_lon
-                case 7: // total_elapsed_time = value.v / 1000.0;
+
                 case 8: // total_timer_time
                 case 10: // total_cycles
                 case 11: // total calories
@@ -1355,6 +1418,11 @@ struct FitFileReaderState
                 default: ; // ignore it
             }
         }
+
+        if (time == 0 && total_elapsed_time > 0) {
+            time = iniTime + total_elapsed_time - 1;
+        }
+
         if (this_start_time == 0 || this_start_time-start_time < 0) {
             //errors << QString("lap %1 has invalid start time").arg(interval);
             this_start_time = start_time; // time was corrected after lap start
@@ -1363,7 +1431,8 @@ struct FitFileReaderState
                 errors << QString("lap %1 is ignored (invalid end time)").arg(interval);
                 return;
             }
-        }
+        } 
+
         if (isLapSwim) {
             // Fill empty laps due to false starts or pauses in some devices
             // s.t. Garmin 910xt - cap to avoid crashes on bad data
@@ -2794,6 +2863,9 @@ struct FitFileReaderState
                     decodeDeveloperFieldDescription(def, time_offset, values);
                     break;
 
+                case 140: /* undocumented Garmin/Firstbeat specific metrics */
+                    decodePhysiologicalMetrics(def, time_offset, values);
+                    break;
 
                 case 1: /* capabilities, device settings and timezone */ break;
                 case 2: decodeDeviceSettings(def, time_offset, values); break;
@@ -2843,7 +2915,6 @@ struct FitFileReaderState
                 case 125: /* unknown */
                 case 131: /* cadence zone */
 
-                case 140: /* unknown */
                 case 141: /* unknown */
                 case 145: /* memo glob */
                 case 147: /* equipment (undocumented) = sensors presets (sensor name, wheel circumference, etc.)  ; see details below: */
@@ -3257,7 +3328,10 @@ void write_session(QByteArray *array, const RideFile *ride, QHash<QString,RideMe
     write_int32(array, value, true);
 
     // 6. sport
-    write_int8(array, 2);
+    // Export as bike, run or swim, default sport is bike. 
+    // todo: support all sports based on tag "Sport"
+    int sport = ride->isRun() ? 1 : ride->isSwim() ? 5 : 2;
+    write_int8(array, sport);
 
     // 7. sub sport
     write_int8(array, 0);
@@ -3453,7 +3527,7 @@ void write_record_definition(QByteArray *array, const RideFile *ride, QMap<int, 
         num_fields ++;
         write_field_definition(fields, 3, 1, 2); // heart_rate (3)
     }
-    if ( withCad && ride->areDataPresent()->cad ) {
+    if ( withCad && (ride->areDataPresent()->cad || (ride->isRun() && ride->areDataPresent()->rcad)) ) {
         num_fields ++;
         write_field_definition(fields, 4, 1, 2); // cadence (4)
     }
@@ -3474,7 +3548,7 @@ void write_record_definition(QByteArray *array, const RideFile *ride, QMap<int, 
         num_fields ++;
         write_field_definition(fields, 13, 1, 2); // temperature (13)
     }
-    if ( (type&2)==1 ) {
+    if ( (type&2)==2 ) {
         num_fields ++;
         write_field_definition(fields, 30, 1, 2); // left_right_balance (30)
     }
@@ -3526,6 +3600,10 @@ void write_record(QByteArray *array, const RideFile *ride, bool withAlt, bool wi
         if ( withCad && ride->areDataPresent()->cad ) {
             write_int8(ridePoint, point->cad);
         }
+        // In runs, cadence is saved in 'rcad' instead of 'cad'
+        if (withCad && ride->isRun() && ride->areDataPresent()->rcad){
+            write_int8(ridePoint, point->rcad);
+        }
         if ( ride->areDataPresent()->km ) {
             write_int32(ridePoint, point->km * 100000, true);
         }
@@ -3540,7 +3618,7 @@ void write_record(QByteArray *array, const RideFile *ride, bool withAlt, bool wi
         if ( (type&1)==1) {
             write_int8(ridePoint, point->temp);
         }
-        if ( (type&2)==1 ) {
+        if ( (type&2)==2 ) {
             write_int8(ridePoint, point->lrbalance);
         }
 

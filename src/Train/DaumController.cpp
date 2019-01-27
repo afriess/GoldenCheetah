@@ -64,9 +64,9 @@ void DaumController::getRealtimeData(RealtimeData &rtData) {
         parent->Stop(1);
         return;
     }
-
+#ifdef GC_Daum_Debug
     qDebug() << "actMode =" <<(int)actMode;
-
+#endif
 	// Calculation simplified from http://www.kreuzotter.de/deutsch/speed.htm
 	double V = daumDevice_->getSpeed() * 0.27778;
 	double slope = atan(rtData.getSlope()) * 0.01;
@@ -81,7 +81,9 @@ void DaumController::getRealtimeData(RealtimeData &rtData) {
 	
 	switch (actMode) {
 		case 2 : 
+#ifdef GC_Daum_Debug		
 			qDebug() << "P load=" << (double)P << "V corr in=" << (double)V << "Slope corr in=" << (double)slope;
+#endif			
 			// 
 			P = round(P / 5)  * 5; 
 	
@@ -113,6 +115,8 @@ void DaumController::setMode(int mode)
 {
 	// mode 1 = ERG     (= Watt)
 	// mode 2 = SLOPE   (= slope %) 
+#ifdef GC_Daum_Debug	
 	qDebug() << "Set mode =" << (int)mode;
+#endif	
 	actMode = mode;
 }

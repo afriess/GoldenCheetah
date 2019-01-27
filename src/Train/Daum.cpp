@@ -59,8 +59,9 @@ int Daum::stop() {
 }
 
 bool Daum::discover(QString dev) {
+#ifdef GC_Daum_Debug	
 	qDebug() << "discover - device: " << dev;
-
+#endif	
     if (!openPort(dev)) {
 		qWarning() << "discover - cannot open device "<< dev; 
         return false;
@@ -85,15 +86,18 @@ bool Daum::discover(QString dev) {
     data = s.read(2);
     if ((int)data[0] != 0x11) {
 		qWarning() << "discover - bad answer";
+#ifdef GC_Daum_Debug		
 		qDebug() << "Byte [0] = " << (int)data[0] << " decimal";		
 		qDebug() << "Byte [1] = " << (int)data[1] << " decimal";		
+#endif		
 		closePort();
         return false;
     }
     data = s.readAll();
     closePort();
-
+#ifdef GC_Daum_Debug
 	qDebug() << "discover - ok ";
+#endif	
     return true;
 }
 
@@ -103,7 +107,9 @@ void Daum::setLoad(double load) {
     QMutexLocker locker(&pvars);
     if (local_load > maxDeviceLoad_) { local_load = maxDeviceLoad_; }
     if (local_load < minDeviceLoad) { local_load = minDeviceLoad; }
+#ifdef GC_Daum_Debug	
     qDebug() << "setLoad(): " << local_load;
+#endif	
     loadToWrite_ = local_load;
 }
 
@@ -155,8 +161,9 @@ bool Daum::closePort() {
 
 void Daum::run() {
     //closePort();
+#ifdef GC_Daum_Debug	
 	qDebug() << "run ...";
-
+#endif
     if (!openPort(serialDeviceName_)) {
         exit(-1);
     }
@@ -195,7 +202,9 @@ void Daum::run() {
 }
 
 void Daum::initializeConnection() {
+#ifdef GC_Daum_Debug	
 	qDebug() << "initializeConnection ...";
+#endif	
     char addr = (char)GetAddress();
     {
         QMutexLocker locker(&pvars);
@@ -211,12 +220,15 @@ void Daum::initializeConnection() {
         qWarning() << "reset device failed";
     }
 
+#ifdef GC_Daum_Debug
     // unused so far
     qDebug() << "CheckCockpit() returned " << CheckCockpit();
-
+#endif
     // check version info for know devices
     int dat = GetDeviceVersion();
+#ifdef GC_Daum_Debug	
 	qDebug() << "GetDeviceVersion() returned " << dat;
+#endif	
     switch (dat) {
     case 0x10:				// Cardio
 	case 0x1E:				// Update Cockpit Older Version to Vita de Luxe
@@ -226,7 +238,9 @@ void Daum::initializeConnection() {
     case 0x50:				// 8080
     case 0x55:				// ??
     case 0x60:				// Therapy
+#ifdef GC_Daum_Debug	
         qDebug() << "Daum cockpit verison: " << dat;
+#endif		
         break;
     default:
         qWarning() << "unable to identify daum cockpit version" << dat;
@@ -261,9 +275,9 @@ void Daum::requestRealtimeData() {
         serial_dev_->readAll();
         addr = deviceAddress_;
     }
-
+#ifdef GC_Daum_Debug
     qDebug() << "querying device info";
-
+#endif
     data.clear();
     data.append((char)0x40);
     data.append(addr);
@@ -303,7 +317,9 @@ void Daum::requestRealtimeData() {
         deviceSpeed_ = speed;
         deviceHeartRate_ = pulse;
     }
+#ifdef GC_Daum_Debug	
 	qDebug() << "pwr=" << (int)pwr;
+#endif	
     // write load to device
     bool p = isPaused();
     unsigned int load = kDefaultLoad;
@@ -312,12 +328,15 @@ void Daum::requestRealtimeData() {
         load = load_;
         pwr = loadToWrite_;
 		if (pwr < 0) {
+#ifdef GC_Daum_Debug			
 			qDebug() << "pwr is negativ !!!! " << (int)pwr;
+#endif			
 			pwr = 0;
 		}	
     }
-
+#ifdef GC_Daum_Debug
 	qDebug() << "load=" << (int)load << "pwr=" << (int)pwr;
+#endif	
     if (!p && (forceUpdate_ || load != pwr)) {
         data.clear();
         data.append((char)0x51);
@@ -325,7 +344,9 @@ void Daum::requestRealtimeData() {
         data.append(MapLoadToByte(pwr));
         qInfo() << "Writing power to device: " << pwr << "W";
         QByteArray res = WriteDataAndGetAnswer(data, 3);
+#ifdef GC_Daum_Debug		
         qDebug() << "set power to " << (int)data[2]*5 << "W";
+#endif
         if (res != data && res[2] != data[2] && pwr > 400) {
             // reduce power limit because some devices are limited too 400W instead of 800W
             QMutexLocker locker(&pvars);

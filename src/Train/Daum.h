@@ -36,6 +36,8 @@
  * and the implementation details are inspired by the Fortius class.
 */
 
+//#define GC_Daum_Debug
+
 class Daum : public QThread
 {
     Q_OBJECT

@@ -34,6 +34,8 @@ public:
     DaumController (TrainSidebar *, DeviceConfiguration *);
 
     Daum *daumDevice_;     // device instance
+	
+	Context *context;
 
     // device control
     int start();            // start capturing
@@ -55,6 +57,8 @@ public:
     void setMode(int);
 private:
 	int actMode;
+	double weight;
+	double height;
 };
 
 #endif // _GC_DaumController_h

@@ -19,6 +19,8 @@
 
 #include "DaumController.h"
 #include "Daum.h"
+#include "Context.h"
+#include "Athlete.h"
 #include "RealtimeData.h"
 
 #include <QMessageBox>
@@ -31,6 +33,14 @@ DaumController::DaumController(TrainSidebar *parent,  DeviceConfiguration *dc) :
 }
 
 int DaumController::start() {
+	QDate date;
+	
+	weight = context->athlete->getWeight(date);
+	height = context->athlete->getHeight();
+#ifdef GC_Daum_Debug	
+	qDebug() << "Weigth =" << (int)weight;
+	qDebug() << "Height =" << (int)height;
+#endif	
     return daumDevice_->start();
 }
 

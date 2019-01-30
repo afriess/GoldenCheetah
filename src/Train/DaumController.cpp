@@ -84,7 +84,7 @@ void DaumController::getRealtimeData(RealtimeData &rtData) {
 
 	switch (actMode) {
 		case 2 : 
-			
+			rtData.setWatts(daumDevice_->getPower());
 #ifdef GC_Daum_Debug		
 			qDebug() << "Slope=" << aktSlope;
 #endif			

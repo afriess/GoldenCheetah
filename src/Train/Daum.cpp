@@ -265,6 +265,17 @@ void Daum::initializeConnection() {
 
     PlaySound();
 }
+void Daum::float2Bytes(float val,byte* bytes_array) {
+	union {
+		float float_variable;
+		byte temp_array[4];
+	} u;
+	// 
+	u.float_variable = val;
+	//
+	memcpy(bytes_array, u.temp_array, 4);
+}
+
 
 void Daum::requestRealtimeData() {
     char addr = -1;
@@ -287,14 +298,22 @@ void Daum::requestRealtimeData() {
     }
 
     // local cache of telemetry data
+	int prg = data[2];
+	int pers = data[3];			// Person
+	int pedalling = data[4];   // either 0/1 or w/ offset of 128
     int pwr = data[5];
     int rpm = data[6];
     int speed = data[7];
+	int dist = data[8] + 256 * data[9];
+	int pedtime = data[10] + 256 * data[11]; 
+	int joule = data[12] + 256 * data[13];
     int pulse = data[14];
-
+	int zust = data[15];
+	int gear = data[16];
+    int reljoule = data[17] + 256 * data[18];
+	
     // sanity check
     if (pwr >= 5 && pwr <= 160) {
-        int pedalling = data[4];   // either 0/1 or w/ offset of 128
         pwr = pwr * 5 * (pedalling != 0 ? 1 : 0);
     } else {
         pwr = 0;
@@ -370,7 +389,7 @@ int Daum::GetAddress() {
     dat.append((char)0x11);
     dat = WriteDataAndGetAnswer(dat, 2);
     if (dat.length() == 2 && (int)dat[0] == 0x11) {
-        return (int)dat[1];
+        return (int)(dat[1]& 0x00FF);
     }
     return -1;
 }
@@ -380,7 +399,7 @@ int Daum::CheckCockpit() {
     dat.append(deviceAddress_);
     dat = WriteDataAndGetAnswer(dat, 3);
     if (dat.length() == 3 && (int)dat[0] == 0x10 && (char)dat[1] == deviceAddress_) {
-        return (int)dat[2];
+        return (int)(dat[2] & 0x00FF);
     }
     return -1;
 }
@@ -390,7 +409,7 @@ int Daum::GetDeviceVersion() {
     dat.append(deviceAddress_);
     dat = WriteDataAndGetAnswer(dat, 11);
     if (dat.length() == 11 && (int)dat[0] == 0x73 && (char)dat[1] == deviceAddress_) {
-        return (int)dat[10];
+        return (int)(dat[10] & 0x00FF);
     }
     return -1;
 }
@@ -411,6 +430,19 @@ bool Daum::StopProgram(unsigned int prog) {
     QByteArray dat;
     dat.append((char)0x22).append(deviceAddress_);
     return WriteDataAndGetAnswer(dat, dat.length() + 1).length() == 3; // device tells pedalling state too
+}
+bool Daum::SetSlope(float slope) {
+	byte bytes[4];
+	QByteArray dat;
+	
+	float2Bytes(slope, &bytes[0]);
+	
+	dat.append((char)0x55).append(deviceAddress_)
+		.append((char)bytes[0])
+		.append((char)bytes[1])
+		.append((char)bytes[2])
+		.append((char)bytes[3]);
+    return WriteDataAndGetAnswer(dat, 6).length() == 6;
 }
 bool Daum::SetDate() {
     QDate d = QDate::currentDate();

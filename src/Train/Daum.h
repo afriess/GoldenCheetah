@@ -36,8 +36,6 @@
  * and the implementation details are inspired by the Fortius class.
 */
 
-//#define GC_Daum_Debug
-
 class Daum : public QThread
 {
     Q_OBJECT
@@ -60,6 +58,7 @@ public:
     bool discover(QString dev);
 
     void setLoad(double load);
+	bool SetSlope(float slope);
     double getPower() const;
     double getSpeed() const;
     double getCadence() const;
@@ -71,6 +70,7 @@ private:
     bool openPort(QString dev);
     bool closePort();
     void initializeConnection();
+	void float2Bytes(float val,byte* bytes_array);
 
     virtual bool ResetDevice();
     virtual bool StartProgram(unsigned int prog);
@@ -100,6 +100,20 @@ private:
 
     // state
     bool paused_;
+	
+	// personal data for bike
+	int num_;
+	int sex_;
+	int height_;
+	int weigth_;
+	int fat_;
+	int coachGrade_;
+	int coachFreq_;
+	int maxWatt_;
+	int maxPulse_;
+	int maxTime_;
+	int maxDist_;
+	int maxCal_;
 
     // inbound
     volatile int devicePower_;

@@ -33,13 +33,16 @@ DaumController::DaumController(TrainSidebar *parent,  DeviceConfiguration *dc) :
 }
 
 int DaumController::start() {
-	QDate date;
-	
-	weight = context->athlete->getWeight(date);
-	height = context->athlete->getHeight();
+//	QDate date;
 #ifdef GC_Daum_Debug	
-	qDebug() << "Weigth =" << (int)weight;
-	qDebug() << "Height =" << (int)height;
+	qDebug() << "start() ";
+#endif	
+	
+//	weight = context->athlete->getWeight(date);
+//	height = context->athlete->getHeight();
+#ifdef GC_Daum_Debug	
+//	qDebug() << "Weigth =" << (int)weight;
+//	qDebug() << "Height =" << (int)height;
 #endif	
     return daumDevice_->start();
 }
@@ -77,34 +80,24 @@ void DaumController::getRealtimeData(RealtimeData &rtData) {
 #ifdef GC_Daum_Debug
     qDebug() << "actMode =" <<(int)actMode;
 #endif
-	// Calculation simplified from http://www.kreuzotter.de/deutsch/speed.htm
-	double V = daumDevice_->getSpeed() * 0.27778;
-	double slope = atan(rtData.getSlope()) * 0.01;
-	// Weight bike + person = 120.0 :-)
-	double wght = 120.0;
-	double Frg = 9.81 * (wght) * (0.0046  * cos(slope) + sin(slope)); 
-	double P = 1.025 * V * (0.3165 * (V * V) + Frg + V * 0.1);
-	if (P<=25) {
-		// Downhill is negative power, set to 25 to avoid problems
-		P = 25.0;
-	};	
-	
+	float aktSlope = (float)rtData.getSlope();
+
 	switch (actMode) {
 		case 2 : 
+			
 #ifdef GC_Daum_Debug		
-			qDebug() << "P load=" << (double)P << "V corr in=" << (double)V << "Slope corr in=" << (double)slope;
+			qDebug() << "Slope=" << aktSlope;
 #endif			
-			// 
-			P = round(P / 5)  * 5; 
-	
-			daumDevice_->setLoad(P);
-			rtData.setWatts(P);
+			if (oldSlope != aktSlope)  
+			  daumDevice_->SetSlope(aktSlope);
+			
 			break;
 		default :
 			// Data is set by setload
 			rtData.setWatts(daumDevice_->getPower());
 			break;
 	}		
+	oldSlope = aktSlope;
     rtData.setHr(daumDevice_->getHeartRate());
     rtData.setCadence(daumDevice_->getCadence());
     rtData.setSpeed(daumDevice_->getSpeed());

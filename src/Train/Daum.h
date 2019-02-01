@@ -58,11 +58,11 @@ public:
     bool discover(QString dev);
 
     void setLoad(double load);
-	bool SetSlope(float slope);
     double getPower() const;
     double getSpeed() const;
     double getCadence() const;
     double getHeartRate() const;
+	bool SetSlope(float slope);
 
 private:
     void run();
@@ -76,11 +76,14 @@ private:
     virtual bool StartProgram(unsigned int prog);
     virtual bool StopProgram(unsigned int prog);
     virtual int GetAddress();
-    virtual int CheckCockpit();
+    virtual bool CheckCockpit();
     virtual int GetDeviceVersion();
     virtual bool SetProgram(unsigned int prog);
+	virtual bool SetGear(unsigned int gear);
+	virtual bool SetStartparam(unsigned int gear);
     virtual bool SetDate();
     virtual bool SetTime();
+	virtual bool SetPerson();
     virtual void PlaySound();
 
     QByteArray WriteDataAndGetAnswer(QByteArray const& dat, int response_bytes);
@@ -95,14 +98,17 @@ private:
     QString serialDeviceName_;
     QSerialPort *serial_dev_;
 
-    char deviceAddress_;
-    unsigned int maxDeviceLoad_;
-
     // state
     bool paused_;
 	
+	// bike data
+	char bikeType_;
+    char deviceAddress_;
+    unsigned int maxDeviceLoad_;
+	
 	// personal data for bike
 	int num_;
+	int old_;
 	int sex_;
 	int height_;
 	int weigth_;

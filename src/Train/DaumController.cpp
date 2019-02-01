@@ -21,6 +21,7 @@
 #include "Daum.h"
 #include "Context.h"
 #include "Athlete.h"
+#include "RideItem.h"
 #include "RealtimeData.h"
 
 #include <QMessageBox>
@@ -28,30 +29,47 @@
 
 DaumController::DaumController(TrainSidebar *parent,  DeviceConfiguration *dc) : RealtimeController(parent, dc) {
     daumDevice_ = new Daum(this, dc != 0 ? dc->portSpec : "", dc != 0 ? dc->deviceProfile : "");
-	// set default Mode
+
+	// 
+    this->parent = parent;
+#ifdef GC_Daum_Debug	
+	qDebug() << "this->parent =" << this->parent;
+	qDebug() << "this->parent->context =" << this->parent->context;
+	qDebug() << "this->parent->context->athlete =" << this->parent->context->athlete;
+#endif	
+
+	// set defaults 
 	actMode = 1;
+	weight = 80.0;
+	height = 175.0;
+	
 }
 
 int DaumController::start() {
-//	QDate date;
 #ifdef GC_Daum_Debug	
 	qDebug() << "start() ";
 #endif	
-	
-//	weight = context->athlete->getWeight(date);
-//	height = context->athlete->getHeight();
+	// Get basicdata for ride
+	weight = this->parent->context->athlete->getWeight(QDate::currentDate());
+	height = this->parent->context->athlete->getHeight();
 #ifdef GC_Daum_Debug	
-//	qDebug() << "Weigth =" << (int)weight;
-//	qDebug() << "Height =" << (int)height;
+	qDebug() << "Weigth =" << weight; 
+	qDebug() << "Height =" << height;
 #endif	
     return daumDevice_->start();
 }
 
 int DaumController::restart() {
+#ifdef GC_Daum_Debug	
+	qDebug() << "restart() ";
+#endif	
     return daumDevice_->restart();
 }
 
 int DaumController::pause() {
+#ifdef GC_Daum_Debug	
+	qDebug() << "pause() ";
+#endif	
     return daumDevice_->pause();
 }
 
@@ -60,6 +78,9 @@ int DaumController::stop() {
 }
 
 bool DaumController::discover(QString name) {
+#ifdef GC_Daum_Debug	
+	qDebug() << "discover() ";
+#endif	
    return daumDevice_->discover(name);
 }
 
@@ -77,16 +98,14 @@ void DaumController::getRealtimeData(RealtimeData &rtData) {
         parent->Stop(1);
         return;
     }
-#ifdef GC_Daum_Debug
-    qDebug() << "actMode =" <<(int)actMode;
-#endif
+
 	float aktSlope = (float)rtData.getSlope();
 
 	switch (actMode) {
 		case 2 : 
 			rtData.setWatts(daumDevice_->getPower());
 #ifdef GC_Daum_Debug		
-			qDebug() << "Slope=" << aktSlope;
+			qDebug() << "Slope=" << aktSlope << " actMode =" <<(int)actMode;
 #endif			
 			if (oldSlope != aktSlope)  
 			  daumDevice_->SetSlope(aktSlope);

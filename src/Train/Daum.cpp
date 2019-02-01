@@ -30,6 +30,18 @@ Daum::Daum(QObject *parent, QString device, QString profile) : QThread(parent),
     deviceHeartRate_(0),
     deviceCadence_(0),
     deviceSpeed_(0),
+	num_(1),
+	sex_(0),
+	height_(175.0),
+	weigth_(85.0),
+	fat_(0),
+	coachGrade_(0),
+	coachFreq_(0),
+	maxWatt_(0),
+	maxPulse_(0),
+	maxTime_(0),
+	maxDist_(0),
+	maxCal_(0),
     load_(kDefaultLoad),
     loadToWrite_(kDefaultLoad),
     forceUpdate_(profile.contains("force", Qt::CaseInsensitive)) {
@@ -69,30 +81,30 @@ bool Daum::discover(QString dev) {
 
     QSerialPort &s(*serial_dev_);
     QByteArray data;
-    data.append((char)0x11);  // Send Get Address
-	data.append((char)0x00);  // af: Dummy, will be ignored by device  
+	
+	// Send Check Cockpit request 
+	//   If the cockpit is to old, it does nothing
+    data.append((char)0x10);  // Send Check Cockpit
+	data.append((char)0x00);  // Is normally ignored by device  
 
     s.write(data);
     if (!s.waitForBytesWritten(1000)) {
-		qWarning() << "discover - timeout send";
+		qWarning() << "check cockpit - timeout send";
 		closePort();
         return false;
     }
     if (!s.waitForReadyRead(1000)) {
-		qWarning() << "discover - timeout read"; 
+		qWarning() << "check cockpit - timeout read"; 
 		closePort();
         return false;
     }
-    data = s.read(2);
-    if ((int)data[0] != 0x11) {
-		qWarning() << "discover - bad answer";
-#ifdef GC_Daum_Debug		
-		qDebug() << "Byte [0] = " << (int)data[0] << " decimal";		
-		qDebug() << "Byte [1] = " << (int)data[1] << " decimal";		
-#endif		
+    data = s.read(3);
+    if ((int)data[0] != 0x10) {
+		qWarning() << "check cockpit - bad answer";
 		closePort();
         return false;
     }
+	// clear all data on serial
     data = s.readAll();
     closePort();
 #ifdef GC_Daum_Debug
@@ -165,6 +177,7 @@ void Daum::run() {
 	qDebug() << "run ...";
 #endif
     if (!openPort(serialDeviceName_)) {
+		qWarning() << "run - cannot open device "<< serialDeviceName_; 
         exit(-1);
     }
 
@@ -172,11 +185,11 @@ void Daum::run() {
         QMutexLocker locker(&pvars);
         timer_ = new QTimer();
         if (timer_ == 0) {
+			qWarning() << "run - cannot create timer "; 
             exit(-1);
         }
         connect(this, SIGNAL(finished()), timer_, SLOT(stop()), Qt::DirectConnection);
         connect(timer_, SIGNAL(timeout()), this, SLOT(requestRealtimeData()), Qt::DirectConnection);
-
         // discard prev. read data
         serial_dev_->readAll();
     }
@@ -190,15 +203,25 @@ void Daum::run() {
         timer_->start();
     }
 
-    StartProgram(0);
+    if (!StartProgram(0)) {
+        qWarning() << "starting program failed";
+    }
 
     // enter event loop and wait for a call to quit() or exit()
     exec();
+	
+    if (!StopProgram(0)) {
+        qWarning() << "stopping program failed";
+    }
 
     {
         QMutexLocker locker(&pvars);
         timer_->stop();
     }
+#ifdef GC_Daum_Debug	
+	qDebug() << "... run finished";
+#endif
+	
 }
 
 void Daum::initializeConnection() {
@@ -211,19 +234,15 @@ void Daum::initializeConnection() {
         deviceAddress_ = addr;
     }
     if (addr < 0) {
-        qWarning() << "unable to detect device address";
+        qWarning() << "unable to detect device address - exiting";
         this->exit(-1);
     }
 
-    // reset device
-    if (!ResetDevice()) {
-        qWarning() << "reset device failed";
+    if (!CheckCockpit()) {
+        qWarning() << "Check Cockpit unsuccessfully - exiting";
+        this->exit(-1);
     }
 
-#ifdef GC_Daum_Debug
-    // unused so far
-    qDebug() << "CheckCockpit() returned " << CheckCockpit();
-#endif
     // check version info for know devices
     int dat = GetDeviceVersion();
 #ifdef GC_Daum_Debug	
@@ -243,26 +262,51 @@ void Daum::initializeConnection() {
 #endif		
         break;
     default:
-        qWarning() << "unable to identify daum cockpit version" << dat;
+        qWarning() << "unable to identify daum cockpit version - exiting" << dat;
         this->exit(-1);
         break;  // unreached
     }
-
+    {
+        QMutexLocker locker(&pvars);
+        bikeType_ = dat;
+    }
+	// needed if the battery is defect
     if (!SetDate()) {
         qWarning() << "set date failed";
     }
     if (!SetTime()) {
         qWarning() << "set time failed";
     }
-
+	// 
+    // reset device
+    if (!ResetDevice()) {
+        qWarning() << "reset device failed";
+    }
+	// start programm means user want a new program
+    if (!StartProgram(0)) {
+        qWarning() << "StartProgram failed";
+    }
+	// we want programm 0
     if (!SetProgram(0)) {
         qWarning() << "setting program failed";
     }
-
-    if (!StartProgram(0)) {
-        qWarning() << "starting program failed";
+	// we want person 1
+    if (!SetPerson()) {
+        qWarning() << "setting person failed";
     }
 
+	// Statparam 
+	// 0 = Roadbike
+	// 1 = Mountainbike
+    if (!SetStartparam(0)) {
+        qWarning() << "set startparameters failed";
+    }
+	// default gear is 10
+    if (!SetGear(10)) {
+        qWarning() << "set gear failed";
+    }
+
+	//
     PlaySound();
 }
 void Daum::float2Bytes(float val,byte* bytes_array) {
@@ -393,15 +437,14 @@ int Daum::GetAddress() {
     }
     return -1;
 }
-int Daum::CheckCockpit() {
+// Fuction 0x10 Check Cockpit
+//   do not send answer back if the bike is to old 
+bool Daum::CheckCockpit() {
     QByteArray dat;
     dat.append((char)0x10);
     dat.append(deviceAddress_);
     dat = WriteDataAndGetAnswer(dat, 3);
-    if (dat.length() == 3 && (int)dat[0] == 0x10 && (char)dat[1] == deviceAddress_) {
-        return (int)(dat[2] & 0x00FF);
-    }
-    return -1;
+    return (dat.length() == 3 && (int)dat[0] == 0x10);
 }
 int Daum::GetDeviceVersion() {
     QByteArray dat;
@@ -419,6 +462,18 @@ bool Daum::SetProgram(unsigned int prog) {
     dat.append((char)0x23).append(deviceAddress_).append((char)prog);
     return WriteDataAndGetAnswer(dat, dat.length() + 1).length() == 4; // device tells pedalling state too
 }
+bool Daum::SetGear(unsigned int gear) {
+    QByteArray dat;
+    if (gear > 28) { gear = 28; }   // clamp to max
+    dat.append((char)0x53).append(deviceAddress_).append((char)gear);
+    return WriteDataAndGetAnswer(dat, 3).length() == 3; // 
+}
+bool Daum::SetStartparam(unsigned int gear) {
+    QByteArray dat;
+    dat.append((char)0x69).append(deviceAddress_).append((char) 0).append((char) 0).append((char)gear);
+    return WriteDataAndGetAnswer(dat, dat.length() + 1).length() == 5; 
+}
+
 bool Daum::StartProgram(unsigned int prog) {
     Q_UNUSED(prog);
     QByteArray dat;
@@ -464,6 +519,26 @@ bool Daum::SetTime() {
             .append((char)tim.hour());
     return WriteDataAndGetAnswer(dat, 2).length() == 2;
 }
+bool Daum::SetPerson() {
+    QByteArray dat;
+    dat.append((char)0x24).append(deviceAddress_)
+		.append((char)num_)
+		.append((char)old_)
+		.append((char)sex_)
+		.append((char)height_)
+		.append((char)weigth_)
+		.append((char)fat_)
+		.append((char)coachGrade_)
+		.append((char)coachFreq_)
+		.append((char)maxWatt_)
+		.append((char)maxPulse_)
+		.append((char)maxTime_)
+		.append((char)maxDist_)
+		.append((char)maxCal_);
+    dat = WriteDataAndGetAnswer(dat, 16);
+    return (dat.length() == 16 && (int)dat[0] == 0x24);
+}
+
 void Daum::PlaySound() {
     return;
     // might be buggy in device

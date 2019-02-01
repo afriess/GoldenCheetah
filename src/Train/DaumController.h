@@ -35,7 +35,8 @@ public:
 
     Daum *daumDevice_;     // device instance
 	
-	//Context *context;
+	double weight;
+	double height;
 
     // device control
     int start();            // start capturing
@@ -58,8 +59,6 @@ public:
 private:
 	int actMode;
 	float oldSlope;
-//	double weight;
-//	double height;
 };
 
 #endif // _GC_DaumController_h

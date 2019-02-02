@@ -34,8 +34,13 @@ DaumController::DaumController(TrainSidebar *parent,  DeviceConfiguration *dc) :
     this->parent = parent;
 #ifdef GC_Daum_Debug	
 	qDebug() << "this->parent =" << this->parent;
-	qDebug() << "this->parent->context =" << this->parent->context;
-	qDebug() << "this->parent->context->athlete =" << this->parent->context->athlete;
+	if (this->parent != 0) {
+		qDebug() << "this->parent->context =" << this->parent->context;
+		qDebug() << "this->parent->context->athlete =" << this->parent->context->athlete;
+	}
+	else {
+		qDebug() << "this->parent is nil";
+	}
 #endif	
 
 	// set defaults 
@@ -50,8 +55,13 @@ int DaumController::start() {
 	qDebug() << "start() ";
 #endif	
 	// Get basicdata for ride
-	weight = this->parent->context->athlete->getWeight(QDate::currentDate());
-	height = this->parent->context->athlete->getHeight();
+	if (this->parent != 0) {
+		weight = this->parent->context->athlete->getWeight(QDate::currentDate());
+		height = this->parent->context->athlete->getHeight();
+	}
+	else {
+		qWarning() << "this->parent is nil, use default weight and height";
+	}
 #ifdef GC_Daum_Debug	
 	qDebug() << "Weigth =" << weight; 
 	qDebug() << "Height =" << height;

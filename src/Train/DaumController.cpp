@@ -28,18 +28,18 @@
 #include <QSerialPort>
 
 DaumController::DaumController(TrainSidebar *parent,  DeviceConfiguration *dc) : RealtimeController(parent, dc) {
-    daumDevice_ = new Daum(this, dc != 0 ? dc->portSpec : "", dc != 0 ? dc->deviceProfile : "");
+    daumDevice_ = new Daum(this, dc != nullptr ? dc->portSpec : "", dc != nullptr ? dc->deviceProfile : "");
 
 	// 
     this->parent = parent;
 #ifdef GC_Daum_Debug	
 	qDebug() << "this->parent =" << this->parent;
-	if (this->parent != 0) {
+    if (this->parent != nullptr) {
 		qDebug() << "this->parent->context =" << this->parent->context;
 		qDebug() << "this->parent->context->athlete =" << this->parent->context->athlete;
 	}
 	else {
-		qDebug() << "this->parent is nil";
+        qDebug() << "this->parent is nullptr";
 	}
 #endif	
 
@@ -47,6 +47,7 @@ DaumController::DaumController(TrainSidebar *parent,  DeviceConfiguration *dc) :
 	actMode = 1;
 	weight = 80.0;
 	height = 175.0;
+	started = false;
 	
 }
 
@@ -55,7 +56,7 @@ int DaumController::start() {
 	qDebug() << "start() ";
 #endif	
 	// Get basicdata for ride
-	if (this->parent != 0) {
+    if (this->parent != nullptr) {
 		weight = this->parent->context->athlete->getWeight(QDate::currentDate());
 		height = this->parent->context->athlete->getHeight();
 	}
@@ -66,6 +67,7 @@ int DaumController::start() {
 	qDebug() << "Weigth =" << weight; 
 	qDebug() << "Height =" << height;
 #endif	
+	started = true;
     return daumDevice_->start();
 }
 
@@ -84,6 +86,10 @@ int DaumController::pause() {
 }
 
 int DaumController::stop() {
+#ifdef GC_Daum_Debug	
+	qDebug() << "stop() ";
+#endif	
+	started = false;
     return daumDevice_->stop();
 }
 
@@ -100,12 +106,26 @@ bool DaumController::discover(QString name) {
  * act accordingly.
  */
 void DaumController::getRealtimeData(RealtimeData &rtData) {
+	if (started != true) {
+#ifdef GC_Daum_Debug		
+		qDebug() << "not started";
+#endif			
+		return;
+	}
     if(!daumDevice_->isRunning()) {
         QMessageBox msgBox;
-        msgBox.setText(tr("Cannot Connect to Daum"));
+        msgBox.setText(tr("Lost Connection to Daum"));
         msgBox.setIcon(QMessageBox::Critical);
         msgBox.exec();
-        parent->Stop(1);
+		// the device is not running anymore. 
+		//   we have to stop, then disconnect and start new
+        if (this->parent != nullptr)
+			this->parent->Stop(1);
+			this->parent->Disconnect();
+#ifdef GC_Daum_Debug		
+			qDebug() << "Lost connection";
+#endif	
+		started = false;		
         return;
     }
 

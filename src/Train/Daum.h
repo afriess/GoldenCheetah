@@ -100,6 +100,8 @@ private:
 
     // state
     bool paused_;
+    bool started_;
+	
 	
 	// bike data
 	char bikeType_;

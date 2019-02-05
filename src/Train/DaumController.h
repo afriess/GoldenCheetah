@@ -37,6 +37,7 @@ public:
 	
 	double weight;
 	double height;
+	bool started;
 
     // device control
     int start();            // start capturing

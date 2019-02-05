@@ -192,6 +192,7 @@ void Daum::run() {
         connect(timer_, SIGNAL(timeout()), this, SLOT(requestRealtimeData()), Qt::DirectConnection);
         // discard prev. read data
         serial_dev_->readAll();
+		started_ = true;
     }
 
     initializeConnection();
@@ -216,7 +217,9 @@ void Daum::run() {
 
     {
         QMutexLocker locker(&pvars);
+		started_ = false;
         timer_->stop();
+		disconnect(timer_,0,0,0);
     }
 #ifdef GC_Daum_Debug	
 	qDebug() << "... run finished";
@@ -324,12 +327,21 @@ void Daum::float2Bytes(float val,byte* bytes_array) {
 void Daum::requestRealtimeData() {
     char addr = -1;
     QByteArray data;
+	bool active;
     // Discard any existing data
     {
         QMutexLocker locker(&pvars);
         serial_dev_->readAll();
         addr = deviceAddress_;
+		active = started_;
     }
+	// if not started the we should do nothing
+	if (active != true) {
+#ifdef GC_Daum_Debug
+    qDebug() << "not started";
+#endif
+		return;
+	}	
 #ifdef GC_Daum_Debug
     qDebug() << "querying device info";
 #endif

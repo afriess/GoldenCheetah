@@ -354,19 +354,31 @@ void Daum::requestRealtimeData() {
     }
 
     // local cache of telemetry data
-	int prg = data[2];
-	int pers = data[3];			// Person
-	int pedalling = data[4];   // either 0/1 or w/ offset of 128
-    int pwr = data[5];
-    int rpm = data[6];
-    int speed = data[7];
-	int dist = data[8] + 256 * data[9];
-	int pedtime = data[10] + 256 * data[11]; 
-	int joule = data[12] + 256 * data[13];
-    int pulse = data[14];
-	int zust = data[15];
-	int gear = data[16];
-    int reljoule = data[17] + 256 * data[18];
+	int prg = data[2];							// used programm
+	int pers = data[3];							// used person (0=guest,1,2,3,4)
+	int pedalling = data[4];   					// either 0/1 or w/ offset of 128
+    int pwr = data[5];							// actual power div by 5 = 5-80(25-400W) or 10-160(25 to 800 W)
+    int rpm = data[6];							// cyclings (0-199)
+    int speed = data[7];						// calculated speed of the bike (0-99km/h), depending of the gear
+	int dist = data[8] + 256 * data[9];			// actual distance (in 100m), calculated by bike 
+	int pedtime = data[10] + 256 * data[11]; 	// actual cycling time (in sec), calculated by bike  
+	int joule = data[12] + 256 * data[13];		// actual used joule (in 100 joule), calculated by bike 
+    int pulse = data[14];						// actual pulse (0-199), measured by bike
+	int zust = data[15];						// 0= no pulse, 1= to low, 2 = ok, 3 = to high, 4 = blinking, 5 = piep and down the power  
+	int gear = data[16];						// actual used gear (1-28)
+    int reljoule = data[17] + 256 * data[18];	// used real joule (in 100 joule) person 0=guest is always 0 !
+	
+	// actual not used information, but collected from Bike
+	//   some of the information should transfered to the Controller and 
+	//   used for generating the sync with video
+	Q_UNUSED(prg);
+	Q_UNUSED(pers);
+	Q_UNUSED(dist);
+	Q_UNUSED(pedtime);
+	Q_UNUSED(joule);
+	Q_UNUSED(zust);
+	Q_UNUSED(gear);
+	Q_UNUSED(reljoule);
 	
     // sanity check
     if (pwr >= 5 && pwr <= 160) {
